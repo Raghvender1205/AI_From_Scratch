@@ -1,0 +1,5 @@
+input_shape: !!python/tuple
+- 1
+- 28
+- 28
+representation_size: 128
