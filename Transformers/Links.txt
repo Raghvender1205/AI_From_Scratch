@@ -1,0 +1,7 @@
+Link to the latest Annotated Transformer Implementation
+
+http://nlp.seas.harvard.edu/2018/04/03/attention.html
+
+Link to the OpenNMT Github
+
+https://www.github.com/opennmt/opennmt-py
