@@ -27,3 +27,7 @@ http://www.d2l.ai/chapter_multilayer-perceptrons/index.html
 - Continuing on ML Cheetsheet Implementing
 - GAN Concepts
 - Implementing and Adding Transformers Comcepts
+- Hands On GPU Accelerated OpenCV and ComputerVision
+- Adding Different GAN Architectures
+- Neural Network Framework using `Eigen` Dependency.
+- AI Framework for C++, CUDA.!!
