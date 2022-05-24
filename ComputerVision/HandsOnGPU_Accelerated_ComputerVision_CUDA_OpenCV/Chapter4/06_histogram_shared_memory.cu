@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
+#include <cuda.h>
 
 #define SIZE 1000
 #define NUM_BIN 256
@@ -22,7 +23,6 @@ __global__ void histogram_shared_memory(int *d_b, int *d_a) {
 int main() {
     int h_a[SIZE];
     for (int i = 0; i < SIZE; i++) {
-        // h_a[i] = bit_reverse(i, log2(SIZE));
         h_a[i] = i % NUM_BIN;
     }
 
@@ -33,7 +33,6 @@ int main() {
     int *d_a;
     int *d_b;
 
-    // Allocate GPU memory
     cudaMalloc((void **)&d_a, SIZE * sizeof(int));
     cudaMalloc((void **)&d_b, NUM_BIN * sizeof(int));
 
