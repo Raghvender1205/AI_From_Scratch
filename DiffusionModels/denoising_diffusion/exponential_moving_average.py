@@ -161,5 +161,5 @@ class EMA(nn.Module):
             diff.mul_(1.0 - curr_decay)
             ma_buffer.sub_(diff)
         
-        def __call__(self, *args, **kwargs):
-            return self.ema_model(*args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        return self.ema_model(*args, **kwargs)
