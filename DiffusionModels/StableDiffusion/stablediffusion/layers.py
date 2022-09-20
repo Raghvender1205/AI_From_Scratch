@@ -17,7 +17,7 @@ class PaddedConv2D(Layer):
 
         return self.conv2d(x)
     
-class GeGELU(Layer):
+class GeGLU(Layer):
     def __init__(self, dim_out):
         super().__init__()
         self.proj = Dense(dim_out * 2)
