@@ -111,7 +111,7 @@ class CLIPTextTransformer(Model):
         self.encoder = CLIPEncoder()
         self.final_layer_norm = LayerNormalization(epsilon=1e-5)
         self.casual_attention_mask = tf.constant(
-            np.triu(np.ones(1, 1, 77, 77), dtype=np.float32) * -np.inf, k=1
+            np.triu(np.ones((1, 1, 77, 77), dtype='float32') * -np.inf, k=1)
         )
 
     def call(self, inputs):
