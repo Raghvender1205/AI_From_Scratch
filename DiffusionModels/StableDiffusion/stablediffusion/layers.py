@@ -16,7 +16,8 @@ class PaddedConv2D(Layer):
         x = self.padding2d(x)
 
         return self.conv2d(x)
-    
+        
+# https://arxiv.org/pdf/2002.05202
 class GeGLU(Layer):
     def __init__(self, dim_out):
         super().__init__()
