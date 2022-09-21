@@ -12,14 +12,14 @@ class CLIPAttention(Layer):
         self.emb_dim = 768
         self.num_heads = 12
         self.head_dim = self.emb_dim // self.num_heads
-        self.scale = self.head_dim ** 0.5
+        self.scale = self.head_dim ** -0.5
         self.q_proj = Dense(self.emb_dim)
         self.k_proj = Dense(self.emb_dim)
         self.v_proj = Dense(self.emb_dim)
         self.out_proj = Dense(self.emb_dim)
 
     def _shape(self, tensor, seq_len: int, batch_size: int):
-        a = tf.reshape(tensor, (batch_size, self.num_heads, self.head_dim))
+        a = tf.reshape(tensor, (batch_size, seq_len, self.num_heads, self.head_dim))
 
         return Permute((2, 1, 3))(a) # bs, n_head, seq_len, head_dim
 
@@ -31,7 +31,7 @@ class CLIPAttention(Layer):
         value_states = self._shape(self.v_proj(hidden_states), tgt_len, -1)
 
         proj_shape = (-1, tgt_len, self.head_dim)
-        query_states = self._shape(query_states, proj_shape)
+        query_states = self._shape(query_states, tgt_len, -1)
         query_states = tf.reshape(query_states, proj_shape)
         key_states = tf.reshape(key_states, proj_shape)
 
@@ -44,6 +44,7 @@ class CLIPAttention(Layer):
 
         attn_weights = tf.nn.softmax(attn_weights)
         attn_output = attn_weights @ value_states
+        attn_output = tf.reshape(attn_output, (-1, self.num_heads, tgt_len, self.head_dim))
         attn_output = Permute((2, 1, 3))(attn_output)
         attn_output = tf.reshape(attn_output, (-1, tgt_len, emb_dim))
 
