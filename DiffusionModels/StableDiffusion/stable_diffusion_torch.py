@@ -1,10 +1,13 @@
 # https://arxiv.org/pdf/2112.10752.pdf
+from msilib import sequence
 import os
 import gzip
 import math
 import re
+from time import time
 import traceback
-from functools import lru_cache
+from functools import lru_cache, reduce
+from typing import Callable, List
 from collections import namedtuple
 
 import numpy as np
@@ -244,10 +247,222 @@ class ResBlock(nn.Module):
         return ret
 
 class CrossAttention(nn.Module):
-    pass
+    def __init__(self, query_dim, context_dim, n_heads, d_head):
+        self.to_q = nn.Linear(query_dim, n_heads*d_head, bias=False)
+        self.to_k = nn.Linear(context_dim, n_heads*d_head, bias=False)
+        self.to_v = nn.Linear(query_dim, n_heads*d_head, bias=False)
+        self.scale = d_head ** -0.5
+        self.num_heads = n_heads
+        self.head_size = d_head
+        self.to_out = [nn.Linear(n_heads*d_head, query_dim)]
 
+    """
+    def sequential(self, ll: List[Callable[[torch.Tensor], torch.Tensor]]):
+        return reduce(lambda x, f: f(x), ll, self)
+    """
+    # Try this !!!
+    def sequential(self, x, layers):
+        for l in layers:
+            x = l(x)
+        return x
+
+    def forward(self, x, context=None):
+        context = x if context is None else context
+        q, k, v = self.to_q(x), self.to_k(context), self.to_v(context)
+        q = torch.reshape(q, shape=(x.shape[0], -1, self.num_heads, self.head_size)).permute(0, 2, 1, 3)
+        k = torch.reshape(k, shape=(x.shape[0], -1, self.num_heads, self.head_size)).permute(0, 2, 3, 1)
+        v = torch.reshape(v, shape=(x.shape[0], -1, self.num_heads, self.head_size)).permute(0, 2, 1, 3)
+
+        score = q.dot(k) * self.scale
+        weights = F.softmax(score)
+        attention = weights.dot(v).permute(0, 2, 1, 3)
+        h_ = attention.reshape(shape=(x.shape[0], -1, self.num_heads * self.head_size))
+        
+        return self.sequential(h_, self.to_out)
 class GeGELU(nn.Module):
-    pass
+    def __init__(self, dim_in, dim_out):
+        self.proj = nn.Linear(dim_in, dim_out * 2)
+        self.dim_out = dim_out
+
+    def forward(self, x):
+        x, gate = torch.chunk(self.proj(x), chunks=2, dim=-1)
+        
+        return x * F.gelu(gate)
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, mult=4):
+        self.net = [
+            GeGELU(dim, dim*mult),
+            lambda x: x,
+            nn.Linear(dim*mult, dim)
+        ]
+
+    # Try this !!!
+    def sequential(self, x, layers):
+        for l in layers:
+            x = l(x)
+        return x
+
+    def forward(self, x):
+        self.sequential(x, self.net) 
+
 
 class BasicTransformerBlock(nn.Module):
-    pass
+    def __init__(self, dim, context_dim, n_heads, d_head):
+        self.attn1 = CrossAttention(dim, dim, n_heads, d_head)
+        self.ff = FeedForward(dim)
+        self.attn2 = CrossAttention(dim, context_dim, n_heads, d_head)
+        self.norm1 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.norm3 = nn.LayerNorm(dim)
+
+    def forward(self, x, context=None):
+        x = self.attn1(self.norm1(x)) + x
+        x = self.attn2(self.norm2(x), context=context) + x
+        x = self.ff(self.norm3(x)) + x
+
+        return x
+
+class SpatialTransformer(nn.Module):
+    def __init__(self, channels, context_dim, n_heads, d_head):
+        self.norm = nn.GroupNorm(channels)
+        assert channels == n_heads * d_head
+        self.proj_in = nn.Conv2d(channels, n_heads * d_head, 1)
+        self.transformer_blocks = [
+            BasicTransformerBlock(channels, context_dim, n_heads, d_head)
+        ]
+        self.proj_out = nn.Conv2d(n_heads * d_head, channels, 1)
+    
+    def forward(self, x, context=None):
+        b, c, h, w = x.shape
+        x_in = x
+        x = self.norm(x)
+        x = self.proj_in(x)
+        x = torch.reshape(x, (b, c, h*w)).permute(b, c, h, w)
+        
+        for block in self.transformer_blocks:
+            x = block(x, context=context)
+        x = x.permute(0, 2, 1).reshape(b, c, h, w)
+        ret = self.proj_out(x) + x_in
+
+        return ret
+    
+class Downsample(nn.Module):
+    def __init__(self, channels):
+        self.op = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1)
+
+    def forward(self, x):
+        return self.op(x)
+    
+
+class Upsample(nn.Module):
+    def __init__(self, channels):
+        self.conv = nn.Conv2d(channels, channels, 3, padding=1)
+
+    def forward(self, x):
+        bs, c, py, px = x.shape
+        x = torch.reshape(x, (bs, c, py, 1, px, 1)).expand(bs, c, py, 2, px, 2).reshape(bs, c, py*2, px*2)
+
+        return self.conv(x)
+
+# TimeStep Embedding
+def timestep_emb(timesteps, dim, max_period=10000):
+    half = dim // 2
+    freqs = torch.exp(-math.log(max_period) * torch.arange(0, half, dtype=torch.float32) / half)
+    args = timesteps.numpy() * freqs
+    embedding = torch.concat([torch.cos(args), torch.sin(args)])
+
+    return torch.Tensor(embedding).reshape(1, -1)
+
+class UNet(nn.Module):
+    def __init__(self):
+        self.time_emb = [
+            nn.Linear(320, 1280),
+            F.silu,
+            nn.Linear(1280, 1280)
+        ]
+
+        # Input
+        self.input_blocks = [
+            [nn.Conv2d(4, 320, kernel_size=3, padding=1)],
+            [ResBlock(320, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
+            [ResBlock(320, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
+            [Downsample(320)],
+            [ResBlock(320, 1280, 640), SpatialTransformer(640, 768, 8, 80)],
+            [ResBlock(640, 1280, 640), SpatialTransformer(640, 768, 8, 80)],
+            [Downsample(640)],
+            [ResBlock(640, 1280, 1280), SpatialTransformer(1280, 768, 8, 160)],
+            [ResBlock(1280, 1280, 1280),
+             SpatialTransformer(1280, 768, 8, 160)],
+            [Downsample(1280)],
+            [ResBlock(1280, 1280, 1280)],
+            [ResBlock(1280, 1280, 1280)]
+        ]
+
+        # Mid  
+        self.middle_block = [
+            ResBlock(1280, 1280, 1280),
+            SpatialTransformer(1280, 768, 8, 160),
+            ResBlock(1280, 1280, 1280)
+        ]
+
+        # Output
+        self.output_blocks = [
+            [ResBlock(2560, 1280, 1280)],
+            [ResBlock(2560, 1280, 1280)],
+            [ResBlock(2560, 1280, 1280), Upsample(1280)],
+            [ResBlock(2560, 1280, 1280),
+             SpatialTransformer(1280, 768, 8, 160)],
+            [ResBlock(2560, 1280, 1280),
+             SpatialTransformer(1280, 768, 8, 160)],
+            [ResBlock(1920, 1280, 1280), SpatialTransformer(
+                1280, 768, 8, 160), Upsample(1280)],
+            [ResBlock(1920, 1280, 640), SpatialTransformer(
+                640, 768, 8, 80)],  # 6
+            [ResBlock(1280, 1280, 640), SpatialTransformer(640, 768, 8, 80)],
+            [ResBlock(960, 1280, 640), SpatialTransformer(
+                640, 768, 8, 80), Upsample(640)],
+            [ResBlock(960, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
+            [ResBlock(640, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
+            [ResBlock(640, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
+        ]
+        self.out = [
+            nn.GroupNorm(320),
+            F.silu,
+            nn.Conv2d(320, 4, kernel_size=3, padding=1)
+        ]
+
+    # Try this !!!
+    def sequential(self, x, layers):
+        for l in layers:
+            x = l(x)
+        return x
+
+    def forward(self, x, timesteps=None, context=None):
+        t_emb = timestep_emb(timesteps, 320)
+        emb = self.sequential(t_emb, self.time_emb)
+
+        def run(x, bb):
+            if isinstance(bb, ResBlock):
+                bb(x, emb)
+            elif isinstance(bb, SpatialTransformer):
+                x = bb(x, context)
+            else:
+                x = bb(x)
+            
+            return x
+        
+        saved_inp = []
+        for i, b in enumerate(self.input_blocks):
+            for bb in b:
+                x = run(x, bb)
+            saved_inp.append(x)
+        for bb in self.middle_block:
+            x = run(x, bb)
+
+        for i, b in enumerate(self.output_blocks):
+            x = torch.cat(saved_inp.pop(), dim=1)
+            for bb in b:
+                x = run(x, bb)
+        
+        return self.sequential(x, self.out)
