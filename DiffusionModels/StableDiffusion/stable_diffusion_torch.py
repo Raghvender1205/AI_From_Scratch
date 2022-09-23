@@ -1,14 +1,11 @@
 # https://arxiv.org/pdf/2112.10752.pdf
-from msilib import sequence
 import os
 import gzip
 import math
 import re
-from time import time
 import traceback
 from functools import lru_cache, reduce
 from typing import Callable, List
-from collections import namedtuple
 
 import numpy as np
 from tqdm import tqdm
@@ -466,3 +463,127 @@ class UNet(nn.Module):
                 x = run(x, bb)
         
         return self.sequential(x, self.out)
+
+# ********** CLIP Encoder Model ***********
+class CLIPMLP(nn.Module):
+    def __init__(self):
+        self.fc1 = nn.Linear(768, 3072)
+        self.fc2 = nn.Linear(3072, 768)
+
+    def forward(self, hidden_states):
+        hidden_states = self.fc1(hidden_states)
+        hidden_states = F.gelu(hidden_states)
+        hidden_states = self.fc2(hidden_states)
+
+        return hidden_states
+
+class CLIPAttention(nn.Module):
+    def __init__(self):
+        self.emb_dim = 768
+        self.num_heads = 12
+        self.head_dim = self.emb_dim // self.num_heads
+        self.scale = self.head_dim ** -0.5
+        self.q_proj = nn.Linear(self.emb_dim, self.emb_dim)
+        self.k_proj = nn.Linear(self.emb_dim, self.emb_dim)
+        self.v_proj = nn.Linear(self.emb_dim, self.emb_dim)
+        self.out_proj = nn.Linear(self.emb_dim, self.emb_dim)
+
+    def _shape(self, tensor, seq_len: int, batch_size: int):
+        return torch.reshape(tensor, (batch_size, seq_len, self.num_heads, self.head_dim)).permute(0, 2, 1, 3)
+
+    def forward(self, hidden_states, casual_attention_mask):
+        batch_size, tgt_len, emb_dim = hidden_states.shape
+        
+        query_states = self.q_proj(hidden_states) * self.scale
+        key_states = self._shape(self.k_proj(hidden_states), -1, batch_size)
+        value_states = self._shape(self.v_proj(hidden_states), -1, batch_size)
+
+        proj_shape = (batch_size * self.num_heads, -1, self.head_dim)
+        query_states = self._shape(query_states, tgt_len, batch_size).reshape(*proj_shape)
+        key_states = key_states.reshape(*proj_shape)
+        src_len = key_states.shape[1]
+        value_states = value_states.reshape(*proj_shape)
+
+        attn_weights = query_states @ key_states.permute(0, 2, 1)
+        attn_weights = attn_weights.reshape(batch_size, self.num_heads, tgt_len, src_len) + casual_attention_mask
+        attn_weights = torch.reshape(attn_weights, (batch_size * self.num_heads, tgt_len, src_len))
+        attn_weights = F.softmax(attn_weights)
+
+        attn_output = attn_weights @ value_states
+        attn_output = attn_output.reshape(batch_size, self.num_heads, tgt_len, self.head_dim)
+        attn_output = attn_output.permute(0, 1, 2, 3)
+        attn_output = attn_output.reshape(batch_size, tgt_len, emb_dim)
+        attn_output = self.out_proj(attn_output)
+
+        return attn_output
+
+class CLIPEncoderLayer(nn.Module):
+    def __init__(self):
+        self.self_attn = CLIPAttention()
+        self.layer_norm1 = nn.LayerNorm(768)
+        self.mlp = CLIPMLP()
+        self.layer_norm2 = nn.LayerNorm(768)
+
+    def forward(self, hidden_states, casual_attention_mask):
+        residual = hidden_states
+        hidden_states = self.layer_norm1(hidden_states, casual_attention_mask)
+        hidden_states = self.self_attn(hidden_states, casual_attention_mask)
+        hidden_states = residual + hidden_states
+
+        residual = hidden_states
+        hidden_states = self.layer_norm1(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+
+        return hidden_states
+
+class CLIPEncoder(nn.Module):
+    def __init__(self):
+        self.layers = [CLIPEncoderLayer() for i in range(12)]
+
+    def forward(self, hidden_states, casual_attention_mask):
+        for i, l in enumerate(self.layers):
+            hidden_states = l(hidden_states, casual_attention_mask)
+        
+        return hidden_states
+
+class CLIPTextEmbedding(nn.Module):
+    def __init__(self):
+        self.pos_ids = torch.empty(1, 77) 
+        self.token_emb = {"weight": torch.empty(49408, 768)}
+        self.pos_emb = {'weight': torch.empty(77, 768)}
+    
+    """
+    def forward(self, input_ids, pos_ids):
+        inputs = torch.zeros((1, len(input_ids), 49408))
+        positions = torch.zeros((1, len(pos_ids), 77))
+        for i, x in enumerate(input_ids):
+            inputs[0][i][x] = 1
+        for i, x in enumerate(pos_ids):
+            positions[0][i][x] = 1
+        
+        input_embeddings = torch.Tensor(inputs, device=self.token_emb['weight'].device) @ self.token_emb['weight']
+        pos_embeddings = torch.Tensor(positions, device=self.pos_emb['weight'].device) @ self.pos_emb['weight']
+
+        return input_embeddings + pos_embeddings
+    """
+    # Original from stablediffusion directory
+    def forward(self, x):
+        input_ids, pos_ids = x
+        word_embeddings = self.token_emb(input_ids)
+        pos_embeddings = self.pos_emb(pos_ids)
+
+        return word_embeddings + pos_embeddings
+
+class CLIPTextTransformer(nn.Module):
+    def __init__(self):
+        self.embedding = CLIPTextEmbedding()
+        self.encoder = CLIPEncoder()
+        self.final_layer_norm = nn.LayerNorm(768)
+
+    def forward(self, input_ids):
+        x = self.embedding(input_ids, list(range(len(input_ids))))
+        casual_attention_mask = torch.triu(torch.ones((1, 1, 77, 77), dtype=torch.float32) * -np.inf, k=1)
+        x = self.encoder(x, torch.Tensor(casual_attention_mask, device=x.device))
+
+        return self.final_layer_norm(x)
