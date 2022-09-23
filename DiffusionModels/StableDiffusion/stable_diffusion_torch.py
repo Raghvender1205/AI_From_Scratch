@@ -70,7 +70,8 @@ class AttentionBlock:
 # ************** AutoEncoder KL ****************
 class AttentionBlock(nn.Module):
     def __init__(self, in_channels):
-        self.norm = nn.GroupNorm(num_channels=in_channels)
+        super().__init__()
+        self.norm = nn.GroupNorm(num_channels=in_channels, num_groups=32)
         self.q = nn.Conv2d(in_channels, in_channels, 1)
         self.k = nn.Conv2d(in_channels, in_channels, 1)
         self.v = nn.Conv2d(in_channels, in_channels, 1)
@@ -107,9 +108,10 @@ class AttentionBlock(nn.Module):
 
 class ResnetBlock(nn.Module):
     def __init__(self, in_channels, out_channels=None):
-        self.norm1 = nn.GroupNorm(in_channels)
+        super().__init__()
+        self.norm1 = nn.GroupNorm(num_channels=in_channels, num_groups=32)
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
-        self.norm2 = nn.GroupNorm(out_channels)
+        self.norm2 = nn.GroupNorm(num_channels=out_channels, num_groups=32)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, padding=1)
         self.nin_shortcut = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else lambda x: x
 
@@ -122,6 +124,7 @@ class ResnetBlock(nn.Module):
 
 class Mid(nn.Module):
     def __init__(self, block_in):
+        super().__init__()
         self.block1 = ResnetBlock(block_in, block_in)
         self.attn1 = AttentionBlock(block_in)
         self.block2 = ResnetBlock(block_in, block_in)
@@ -136,6 +139,7 @@ class Mid(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self):
+        super().__init__()
         size = [(128, 256), (256, 512), (512, 512), (512, 512)]
         self.conv_in = nn.Conv2d(4, 512, 3, padding=1)
         self.mid = Mid(512)
@@ -151,7 +155,7 @@ class Decoder(nn.Module):
                 layers[-1]['upsample'] = {'conv': nn.Conv2d(s[0], s[0], 3, padding=1)}
         self.up = layers
 
-        self.norm_out = nn.GroupNorm(128)
+        self.norm_out = nn.GroupNorm(num_channels=128, num_groups=32)
         self.conv_out = nn.Conv2d(128, 3, 3, padding=1)
 
     def forward(self, x):
@@ -172,6 +176,7 @@ class Decoder(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self):
+        super(Encoder, self).__init__()
         sz = [(128, 128), (128, 256), (256, 512), (512, 512)]
         self.conv_in = nn.Conv2d(3, 128, 3, padding=1)
 
@@ -186,7 +191,7 @@ class Encoder(nn.Module):
                 layers[-1]['downsample'] = {'conv': nn.Conv2d(s[1], s[1], 3, stride=2, padding=(0, 1, 0, 1))}
         self.down = layers    
         self.mid = Mid(512)
-        self.norm_out = nn.GroupNorm(512)
+        self.norm_out = nn.GroupNorm(num_channels=512, num_groups=32)
         self.conv_out = nn.Conv2d(512, 8, 3, padding=1)
 
     def forward(self, x):
@@ -204,6 +209,7 @@ class Encoder(nn.Module):
 
 class AutoEncoder(nn.Module):
     def __init__(self):
+        super(AutoEncoder, self).__init__()
         self.encoder = Encoder()
         self.decoder = Decoder()
         self.quant_conv = nn.Conv2d(8, 8, 1)
@@ -221,17 +227,19 @@ class AutoEncoder(nn.Module):
 # ************** Diffusion Model ******************
 class ResBlock(nn.Module):
     def __init__(self, channels, emb_channels, out_channels):
+        super(ResBlock, self).__init__()
         self.in_layers = [
-            nn.GroupNorm(channels),
+            nn.GroupNorm(num_channels=channels, num_groups=32),
             F.silu,
             nn.Conv2d(channels, out_channels, 3, padding=1)
         ]
         self.emb_layers = [
             F.silu,
-            nn.Conv2d(emb_channels, out_channels)
+            # nn.Conv2d(emb_channels, out_channels),
+            nn.Linear(in_features=emb_channels, out_features=out_channels)
         ]
         self.out_layers = [
-            nn.GroupNorm(out_channels),
+            nn.GroupNorm(num_channels=out_channels, num_groups=32),
             F.silu,
             lambda x: x,
             nn.Conv2d(out_channels, out_channels, 3, padding=1)
@@ -249,6 +257,7 @@ class ResBlock(nn.Module):
 
 class CrossAttention(nn.Module):
     def __init__(self, query_dim, context_dim, n_heads, d_head):
+        super(CrossAttention, self).__init__()
         self.to_q = nn.Linear(query_dim, n_heads*d_head, bias=False)
         self.to_k = nn.Linear(context_dim, n_heads*d_head, bias=False)
         self.to_v = nn.Linear(query_dim, n_heads*d_head, bias=False)
@@ -282,6 +291,7 @@ class CrossAttention(nn.Module):
         return self.sequential(h_, self.to_out)
 class GeGELU(nn.Module):
     def __init__(self, dim_in, dim_out):
+        super(GeGELU, self).__init__()
         self.proj = nn.Linear(dim_in, dim_out * 2)
         self.dim_out = dim_out
 
@@ -292,6 +302,7 @@ class GeGELU(nn.Module):
 
 class FeedForward(nn.Module):
     def __init__(self, dim, mult=4):
+        super(FeedForward, self).__init__()
         self.net = [
             GeGELU(dim, dim*mult),
             lambda x: x,
@@ -310,6 +321,7 @@ class FeedForward(nn.Module):
 
 class BasicTransformerBlock(nn.Module):
     def __init__(self, dim, context_dim, n_heads, d_head):
+        super(BasicTransformerBlock, self).__init__()
         self.attn1 = CrossAttention(dim, dim, n_heads, d_head)
         self.ff = FeedForward(dim)
         self.attn2 = CrossAttention(dim, context_dim, n_heads, d_head)
@@ -326,8 +338,9 @@ class BasicTransformerBlock(nn.Module):
 
 class SpatialTransformer(nn.Module):
     def __init__(self, channels, context_dim, n_heads, d_head):
-        self.norm = nn.GroupNorm(channels)
+        super(SpatialTransformer, self).__init__()
         assert channels == n_heads * d_head
+        self.norm = nn.GroupNorm(num_channels=channels, num_groups=32)
         self.proj_in = nn.Conv2d(channels, n_heads * d_head, 1)
         self.transformer_blocks = [
             BasicTransformerBlock(channels, context_dim, n_heads, d_head)
@@ -350,6 +363,7 @@ class SpatialTransformer(nn.Module):
     
 class Downsample(nn.Module):
     def __init__(self, channels):
+        super(Downsample, self).__init__()
         self.op = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1)
 
     def forward(self, x):
@@ -358,6 +372,7 @@ class Downsample(nn.Module):
 
 class Upsample(nn.Module):
     def __init__(self, channels):
+        super(Upsample, self).__init__()
         self.conv = nn.Conv2d(channels, channels, 3, padding=1)
 
     def forward(self, x):
@@ -377,6 +392,7 @@ def timestep_emb(timesteps, dim, max_period=10000):
 
 class UNet(nn.Module):
     def __init__(self):
+        super(UNet, self).__init__()
         self.time_emb = [
             nn.Linear(320, 1280),
             F.silu,
@@ -428,7 +444,7 @@ class UNet(nn.Module):
             [ResBlock(640, 1280, 320), SpatialTransformer(320, 768, 8, 40)],
         ]
         self.out = [
-            nn.GroupNorm(320),
+            nn.GroupNorm(num_channels=320, num_groups=32),
             F.silu,
             nn.Conv2d(320, 4, kernel_size=3, padding=1)
         ]
@@ -471,6 +487,7 @@ class UNet(nn.Module):
 # ********** CLIP Encoder Model ***********
 class CLIPMLP(nn.Module):
     def __init__(self):
+        super(CLIPMLP, self).__init__()
         self.fc1 = nn.Linear(768, 3072)
         self.fc2 = nn.Linear(3072, 768)
 
@@ -483,6 +500,7 @@ class CLIPMLP(nn.Module):
 
 class CLIPAttention(nn.Module):
     def __init__(self):
+        super(CLIPAttention, self).__init__()
         self.emb_dim = 768
         self.num_heads = 12
         self.head_dim = self.emb_dim // self.num_heads
@@ -523,6 +541,7 @@ class CLIPAttention(nn.Module):
 
 class CLIPEncoderLayer(nn.Module):
     def __init__(self):
+        super(CLIPEncoderLayer, self).__init__()
         self.self_attn = CLIPAttention()
         self.layer_norm1 = nn.LayerNorm(768)
         self.mlp = CLIPMLP()
@@ -543,6 +562,7 @@ class CLIPEncoderLayer(nn.Module):
 
 class CLIPEncoder(nn.Module):
     def __init__(self):
+        super(CLIPEncoder, self).__init__()
         self.layers = [CLIPEncoderLayer() for i in range(12)]
 
     def forward(self, hidden_states, casual_attention_mask):
@@ -553,6 +573,7 @@ class CLIPEncoder(nn.Module):
 
 class CLIPTextEmbedding(nn.Module):
     def __init__(self):
+        super(CLIPTextEmbedding, self).__init__()
         self.pos_ids = torch.empty(1, 77) 
         self.token_emb = {"weight": torch.empty(49408, 768)}
         self.pos_emb = {'weight': torch.empty(77, 768)}
@@ -581,6 +602,7 @@ class CLIPTextEmbedding(nn.Module):
 
 class CLIPTextTransformer(nn.Module):
     def __init__(self):
+        super(CLIPTextTransformer, self).__init__()
         self.embedding = CLIPTextEmbedding()
         self.encoder = CLIPEncoder()
         self.final_layer_norm = nn.LayerNorm(768)
@@ -741,5 +763,19 @@ class SimpleTokenizer(object):
         )
         return text
 
-if __name__ == '__main__':
+# *************** Stable Diffusion *************
+class StableDiffusion(nn.Module):
+    def __init__(self):
+        super(StableDiffusion, self).__init__()
+        self.alphas_cumprod = torch.empty(1000)
+        self.model = UNet()
+        self.first_stage_model = AutoEncoder()
+        self.cond_stage_model = CLIPTextTransformer()
     
+FILENAME = "sd-v1-4.ckpt"
+if __name__ == '__main__':
+    torch.no_grad()
+    model = StableDiffusion()
+    ckpt = torch.load(FILENAME)
+    model.load_state_dict(ckpt['state_dict'])
+    print(model)
