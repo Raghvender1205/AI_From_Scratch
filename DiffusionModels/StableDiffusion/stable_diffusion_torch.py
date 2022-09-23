@@ -578,8 +578,8 @@ class CLIPTextEmbedding(nn.Module):
         self.token_emb = {"weight": torch.empty(49408, 768)}
         self.pos_emb = {'weight': torch.empty(77, 768)}
     
-    """
-    def forward(self, input_ids, pos_ids):
+    def forward(self, x):
+        input_ids, pos_ids = x
         inputs = torch.zeros((1, len(input_ids), 49408))
         positions = torch.zeros((1, len(pos_ids), 77))
         for i, x in enumerate(input_ids):
@@ -591,6 +591,7 @@ class CLIPTextEmbedding(nn.Module):
         pos_embeddings = torch.Tensor(positions, device=self.pos_emb['weight'].device) @ self.pos_emb['weight']
 
         return input_embeddings + pos_embeddings
+    
     """
     # Original from stablediffusion directory
     def forward(self, x):
@@ -599,7 +600,7 @@ class CLIPTextEmbedding(nn.Module):
         pos_embeddings = self.pos_emb(pos_ids)
 
         return word_embeddings + pos_embeddings
-
+    """
 class CLIPTextTransformer(nn.Module):
     def __init__(self):
         super(CLIPTextTransformer, self).__init__()
@@ -688,18 +689,11 @@ class SimpleTokenizer(object):
         vocab = vocab + [v + "</w>" for v in vocab]
         for merge in merges:
             vocab.append("".join(merge))
-        vocab.extend(["<|startoftext|>", "<|endoftext|>"])
+        vocab.extend(['<|startoftext|>', '<|endoftext|>'])
         self.encoder = dict(zip(vocab, range(len(vocab))))
-        self.decoder = {v: k for k, v in self.encoder.items()}
         self.bpe_ranks = dict(zip(merges, range(len(merges))))
-        self.cache = {
-            "<|startoftext|>": "<|startoftext|>",
-            "<|endoftext|>": "<|endoftext|>",
-        }
-        self.pat = re.compile(
-            r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
-            re.IGNORECASE,
-        )
+        self.cache = {'<|startoftext|>': '<|startoftext|>', '<|endoftext|>': '<|endoftext|>'}
+        self.pat = self.pat = re.compile(r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[^\s]+""", re.IGNORECASE)
 
     def bpe(self, token):
         if token in self.cache:
@@ -779,3 +773,32 @@ if __name__ == '__main__':
     ckpt = torch.load(FILENAME)
     model.load_state_dict(ckpt['state_dict'], strict=False)
     print(model)
+
+    # Run through CLIP
+    tokenizer = SimpleTokenizer()
+    phrase = tokenizer.encode("Universe in a jar")
+
+    context = model.cond_stage_model.embedding(phrase)
+    print('CLIP Context', context.shape)
+    
+    phrase = tokenizer.encoder("")
+    unconditional_context = model.cond_stage_model.embedding(phrase)
+
+    def get_model_output(latent, t):
+        timesteps = torch.Tensor([t])
+        unconditional_latent = model.cond_stage_model.diffusion_model(latent, timesteps, unconditional_context)
+        latent = model.model.diffusion_model(latent, timesteps, context)
+
+        unconditional_guidance_scale = 7.5
+        e_t = unconditional_context + unconditional_guidance_scale * (latent - unconditional_latent)
+        
+        return e_t
+
+    TIMESTEPS = int(os.getenv("TIMESTEPS", "5"))
+    timesteps = list(torch.arange(1, 1000, 1000/TIMESTEPS))
+    print(f"Running for {timesteps} timesteps")
+    alphas = [model.alphas_cumprod.numpy()[t] for t in timesteps]
+    alphas_prev = [1.0] + alphas[:-1]
+
+    def get_x_prev_and_prev_x0(x, e_t, idx):
+        temp = 1
