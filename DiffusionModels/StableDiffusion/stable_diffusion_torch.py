@@ -777,5 +777,5 @@ if __name__ == '__main__':
     torch.no_grad()
     model = StableDiffusion()
     ckpt = torch.load(FILENAME)
-    model.load_state_dict(ckpt['state_dict'])
+    model.load_state_dict(ckpt['state_dict'], strict=False)
     print(model)
