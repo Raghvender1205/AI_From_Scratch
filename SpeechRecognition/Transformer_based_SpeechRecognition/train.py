@@ -1,4 +1,3 @@
-from ast import Call
 import tensorflow as tf
 from tensorflow import keras
 from keras.callbacks import Callback, LearningRateScheduler
