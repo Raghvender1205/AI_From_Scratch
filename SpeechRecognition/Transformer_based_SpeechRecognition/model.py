@@ -115,3 +115,101 @@ class Decoder(Layer):
 
         return ffn_out_norm
 
+
+class Transformer(Model):
+    def __init__(self, num_hid=64, num_head=2, num_feed_forward=128, src_maxlen=100,
+                 target_maxlen=100, num_layers_enc=4, num_layers_dec=1, num_classes=10):
+        super().__init__()
+        self.loss_metric = Mean(name='loss')
+        self.num_layers_enc = num_layers_enc
+        self.num_layers_dec = num_layers_dec
+        self.target_maxlen = target_maxlen
+        self.num_classes = num_classes
+
+        self.enc_input = SpeechFeatureEmbedding(
+            num_hid=num_hid, maxlen=src_maxlen)
+        self.dec_input = TokenEmbedding(
+            num_vocab=num_classes, maxlen=target_maxlen, num_hid=num_hid
+        )
+
+        self.encoder = Sequential(
+            [self.enc_input]
+            + [
+                Encoder(num_hid, num_head, num_feed_forward)
+                for _ in range(num_layers_enc)
+            ]
+        )
+        for i in range(num_layers_dec):
+            setattr(self, f'dec_layer_{i}', Decoder(
+                num_hid, num_head, num_feed_forward))
+
+        self.classifier = Dense(num_classes)
+
+    def decode(self, enc_out, target):
+        y = self.dec_input(target)
+        for i in range(self.num_layers_dec):
+            y = getattr(self, f'dec_layer_{i}')(enc_out, y)
+
+        return y
+
+    def call(self, inputs):
+        src = inputs[0]
+        target = inputs[1]
+        x = self.encoder(src)
+        y = self.decode(x, target)
+
+        return self.classifier(y)
+
+    @property
+    def metrics(self):
+        return [self.loss_metric]
+
+    def train_step(self, batch):
+        source = batch['source']
+        target = batch['target']
+        dec_input = target[:, :-1]
+        dec_target = target[:, 1:]
+
+        with tf.GradientTape() as tape:
+            preds = self([source, dec_input])
+            one_hot = tf.one_hot(dec_input, depth=self.num_classes)
+            mask = tf.math.logical_not(tf.math.equal(dec_target, 0))
+            loss = self.compiled_loss(one_hot, preds, sample_weight=mask)
+        trainble_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainble_vars)
+        self.optimizer.apply_gradients(zip(gradients, trainble_vars))
+        self.loss_metric.update_state(loss)
+
+        return {'loss': self.loss_metric.result()}
+
+    def test_step(self, batch):
+        source = batch["source"]
+        target = batch["target"]
+        dec_input = target[:, :-1]
+        dec_target = target[:, 1:]
+        preds = self([source, dec_input])
+        one_hot = tf.one_hot(dec_target, depth=self.num_classes)
+        mask = tf.math.logical_not(tf.math.equal(dec_target, 0))
+        loss = self.compiled_loss(one_hot, preds, sample_weight=mask)
+        self.loss_metric.update_state(loss)
+
+        return {"loss": self.loss_metric.result()}
+
+    def generate(self, src, target_start_token_idx):
+        """
+        Performs Inference over on batch of inputs using greedy decoding 
+        """
+        bs = tf.shape(src)[0]
+        enc = self.encoder(src)
+        dec_input = tf.ones((bs, 1), dtype=tf.int32) * target_start_token_idx
+        dec_logits = []
+
+        for i in range(self.target_maxlen - 1):
+            dec_out = self.decode(enc, dec_input)
+            logits = self.classifier(dec_out)
+            logits = tf.argmax(logits, axis=-1, output_type=tf.int32)
+            last_logit = tf.expand_dims(logits[:, -1], axis=-1)
+            dec_logits.append(last_logit)
+            dec_input = tf.concat([dec_input, last_logit], axis=-1)
+        
+        return dec_input
