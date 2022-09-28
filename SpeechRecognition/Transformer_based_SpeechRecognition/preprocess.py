@@ -12,7 +12,7 @@ keras.utils.get_file(
     cache_dir=".",
 )
 
-saveto = "./datasets/LJSpeech-1.1"
+saveto = "./datasets/data"
 wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
 
 id_to_text = {}
