@@ -1,4 +1,4 @@
-# BEiT: Masked Image Modeling 
+# BEiT: BERT PreTraining of Image Transformers
 
 - Paper: https://arxiv.org/abs/2106.08254
 
