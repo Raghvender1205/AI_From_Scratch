@@ -205,9 +205,29 @@ class CNN():
     def predict(self, x):
         return self.network(x)
 
+def visualize_layer(model, dataset, image_idx: int, layer_idx: int):
+    dataloader = DataLoader(dataset, 250)
+    for images, labels in dataloader:
+        images, labels = images.to(device), labels.to(device)
+
+    # Derive output from Layer of Intrest
+    output = model.network.network[:layer_idx].forward(images[image_idx])
+    out_shape = output.shape
+
+    # Classify image
+    predicted_class = model.predict(images[image_idx])
+    print(f'actual class: {labels[image_idx]}\npredicted class: {torch.argmax(predicted_class)}')
+
+    # Visualising layer
+    plt.figure(dpi=150)
+    plt.title(f'visualising output')
+    plt.imshow(np.transpose(make_grid(output.cpu().view(out_shape[0], 1, 
+                                                            out_shape[1], 
+                                                            out_shape[2]), 
+                                        padding=2, normalize=True), (1,2,0)))
+
 
 if __name__ == '__main__':
-    """
     model1 = CNN(ConvNet1())
     log_dict1 = model1.train(nn.CrossEntropyLoss(), epochs=60, batch_size=64, training_set=train_set, validation_set=valid_set)
 
@@ -219,15 +239,13 @@ if __name__ == '__main__':
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.show()
-    """
-    """
-    Model1
-    training_loss: 1.5325  training_accuracy: 0.878  validation_loss: 1.5471 validation_accuracy: 0.867
-    """
+    
+    # Model1
+    # training_loss: 1.5325  training_accuracy: 0.878  validation_loss: 1.5471 validation_accuracy: 0.867
     # Model 2
-    model_2 = CNN(ConvNet2())
+    model2 = CNN(ConvNet2())
 
-    log_dict_2 = model_2.train(nn.CrossEntropyLoss(), epochs=60, batch_size=64,
+    log_dict_2 = model2.train(nn.CrossEntropyLoss(), epochs=60, batch_size=64,
                            training_set=train_set, validation_set=valid_set)
     sns.lineplot(y=log_dict_2['training_accuracy_per_epoch'], x=range(
         len(log_dict_2['training_accuracy_per_epoch'])), label='training')
@@ -243,3 +261,10 @@ if __name__ == '__main__':
     0%|          | 0/157 [00:00<?, ?it/s]
     training_loss: 1.5329  training_accuracy: 0.871  validation_loss: 1.5513 validation_accuracy: 0.862
     """
+    # How GlobalMax and GlobalAvgPooling works??
+    print(model1.network)
+    print(model2.network)
+    # GlobalAvg
+    visualize_layer(model=model1, dataset=valid_set, image_idx=2, layer_idx=16)
+    # GlobaMax
+    visualize_layer(model=model2, dataset=valid_set, image_idx=2, layer_idx=16)
