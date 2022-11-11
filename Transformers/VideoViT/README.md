@@ -18,3 +18,9 @@ There are 4 variants of `ViViT`
 2. Factorized Encoder
 3. Factorized Self-Attention
 4. Factorized Dot-product Attention
+
+## Usage
+Run the Python Script to run on your local enviornment or hosted enviornment.
+```
+python videovit.py
+```

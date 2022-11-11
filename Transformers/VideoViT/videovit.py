@@ -199,6 +199,29 @@ def train():
 
     return model
 
+# Helper Function for Inference
+def box_for_grid(image_widget, fit):
+    """
+    Create a VBox to hold image 
+    """
+    if fit is not None:
+        fit_str = "'{}'".format(fit)
+    else:
+        fit_str = str(fit)
+
+    h = ipywidgets.HTML(value="" + str(fit_str) + "")
+
+    # Make the green box with the image widget inside it
+    boxb = ipywidgets.widgets.Box()
+    boxb.children = [image_widget]
+
+    # Compose into a vertical box
+    vb = ipywidgets.widgets.VBox()
+    vb.layout.align_items = "center"
+    vb.children = [h, boxb]
+    
+    return vb
+
 if __name__ == '__main__':
     # Dataset
     info = medmnist.INFO[DATASET_NAME]
@@ -215,3 +238,40 @@ if __name__ == '__main__':
     # Train
     model = train()
     print(model)
+
+    # Inference
+    NUM_SAMPLES_VIZ = 25
+    testsamples, labels = next(iter(testloader))
+    testsamples, labels = testsamples[:NUM_SAMPLES_VIZ], labels[:NUM_SAMPLES_VIZ]
+
+    ground_truths = []
+    preds = []
+    videos = []
+
+    for i, (testsample, label) in enumerate(zip(testsamples, labels)):
+        # Generate gif
+        with io.BytesIO() as gif:
+            imageio.mimsave(gif, (testsample.numpy() *
+                                255).astype("uint8"), "GIF", fps=5)
+            videos.append(gif.getvalue())
+
+        # Get model prediction
+        output = model.predict(tf.expand_dims(testsample, axis=0))[0]
+        pred = np.argmax(output, axis=0)
+
+        ground_truths.append(label.numpy().astype("int"))
+        preds.append(pred)
+
+    boxes = []
+    for i in range(NUM_SAMPLES_VIZ):
+        ib = ipywidgets.widgets.Image(value=videos[i], width=100, height=100)
+        true_class = info["label"][str(ground_truths[i])]
+        pred_class = info["label"][str(preds[i])]
+        caption = f"T: {true_class} | P: {pred_class}"
+
+        boxes.append(box_for_grid(ib, caption))
+
+    ipywidgets.widgets.GridBox(
+        boxes, layout=ipywidgets.widgets.Layout(
+            grid_template_columns="repeat(5, 200px)")
+    )
