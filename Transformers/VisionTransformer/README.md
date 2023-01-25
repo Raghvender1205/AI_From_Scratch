@@ -51,3 +51,24 @@ Inside the `MultiHead Attention`, the inputs are converted to `197 x 2304 (768*3
 These matrices are then further reshaped into `12 x 197 x 64` to represent 12 attention heads. Now, we perform `Attention` inside the `MultiHead Attention Block` given by $Attention(qkv) = softmax(qk^T/\sqrt{d_x})*v$
 
 Once we get the outputs from `Multi-Head Attention` block, these are added to the `skip connections` to get final outputs that again get passed to `LayerNorm` before being fed to `MLP` block.
+
+`MLP` block consists of 2 `Linear` layers and a `GeLU` non-linearity. The outputs from `MLP` block are again added to the skip connections to get final output from 1 layer of the `Transformer Encoder`.
+
+<img src="https://amaarora.github.io/images/vit-06.png"/>
+
+Above is the Transformer Encoder. A single encoder contains 12 layers in which the outputs from the first layer are fed into the second layer and so on till 12th layer outputs are then fed to the `MLP` head to get class predictions.
+
+## Implementation
+ViT Implementation includes
+1. Patch Embeddings
+2. MLP 
+3. Attention and Multi-Head Attention
+4. Block
+5. Main Architecture
+
+### 1. Patch Embeddings
+```python 
+
+```
+
+It can found at `vit.py`.
