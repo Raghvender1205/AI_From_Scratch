@@ -1,0 +1,2 @@
+## CUDA Memory Coalescing 
+In CUDA, accessing a `global` memory from a CUDA Kernel would affect its performance. To reduce the `Global` memory IO, we reduce the number of global memory `access` by `colescing` the global memory access and cache the reusable data in the fast shared memory.
