@@ -21,5 +21,13 @@ https://towardsdatascience.com/bert-explained-state-of-the-art-language-model-fo
 ## Swin Transformer
 https://github.com/microsoft/Swin-Transformer
 
+## Vision Transformer PyTorch Finetuning and Iterative Erasing
+https://medium.com/@lucrece.shin/ch-9-vision-transformer-part-i-introduction-and-fine-tuning-in-pytorch-14674920c2ea
+
+https://medium.com/artificialis/ch-10-vision-transformer-part-ii-iterative-erasing-of-unattended-image-regions-in-pytorch-6c5bb77823a9
+
+https://github.com/jeonsworld/ViT-pytorch
+
 ## TODO:
 Add Many More...!!!
+https://github.com/huggingface/transformers/tree/main/examples

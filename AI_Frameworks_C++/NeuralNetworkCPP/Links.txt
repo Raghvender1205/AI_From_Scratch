@@ -1,0 +1,4 @@
+https://github.com/Whiax/NeuralNetworkCpp
+
+# Medium Link
+https://hyugen-ai.medium.com/neural-network-in-c-from-scratch-and-backprop-free-optimizer-d2a34bb92688

@@ -1,0 +1,6 @@
+https://github.com/SimonBlanke/Gradient-Free-Optimizers
+
+Nevergrad
+https://facebookresearch.github.io/nevergrad/optimization.html
+
+https://github.com/facebookresearch/nevergrad

@@ -7,9 +7,6 @@ train_dataset = torchaudio.datasets.LIBRISPEECH(
 test_dataset = torchaudio.datasets.LIBRISPEECH(
     './', url='test-clean', download=True)
 
-torchaudio.transforms.FrequencyMasking()
-torchaudio.transforms.TimeMasking()
-
 char_map_str = """
  ' 0
  <SPACE> 1
@@ -46,9 +43,8 @@ class TextTransform:
     """
     Maps characters to integers and vice versa
     """
-
     def __init__(self):
-        char_map_str = char_map_str
+        self.char_map_str = char_map_str
         self.char_map = {}
         self.index_map = {}
         for line in char_map_str.strip().split('\n'):

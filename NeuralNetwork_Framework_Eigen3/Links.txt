@@ -1,0 +1,2 @@
+# Eigen3 Chapters
+http://eigen.tuxfamily.org/dox/modules.html

@@ -1,0 +1,11 @@
+Dive2DeepLearning Sequnce Models Documentation
+https://classic.d2l.ai/chapter_recurrent-neural-networks/sequence.html
+
+Custom LSTM/RNN 
+https://colab.research.google.com/drive/1Rb8OiF-AZ_Y3uFj1O2S0IyocFMhHoTCV?usp=sharing
+
+AI Summer RNN Scratch Blog
+https://theaisummer.com/gru/
+
+PyTorch Examples for Time Sequence Prediction
+https://github.com/pytorch/examples/tree/master/time_sequence_prediction
