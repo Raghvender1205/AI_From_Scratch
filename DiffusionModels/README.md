@@ -35,18 +35,18 @@ $$p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)$$
 
 We model this as `Gaussian` as well:
 
-$$p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1};\mu_\theta(\mathbf{x}_t, t), \sum_{\theta}(\mathbf{x}_t, t))$$
+$$p_{\theta}(\mathbf{x}_{t-1}|\mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1}; \mu_\theta(\mathbf{x}_t, t), \Sigma_{\theta}(\mathbf{x}_t, t))$$
 
-Instead of predicting $\mu_{\theta}$ and $\sum_{\theta}$ directly, [DDPM](https://arxiv.org/abs/2006.11239) reformulates the problem to predict the noise $\epsilon$:
+Instead of predicting $\mu_{\theta}$ and $\Sigma_{\theta}$ directly, [DDPM](https://arxiv.org/abs/2006.11239) reformulates the problem to predict the noise $\epsilon$:
 
 $$\mathcal{L}_{\text{simple}} = \mathbb{E}_{\mathbf{x}_0, \mathbf{\epsilon}, t} \left[ \|\mathbf{\epsilon} - \mathbf{\epsilon}_\theta(\mathbf{x}_t, t)\|^2 \right]$$
 
 This becomes `MSE` loss, where the network tries to predict the exact noise added at step t.
 
 ## 3. Generation (Sampling)
-Once trained, we start from `pure noise` $\mathbf{x}_T \sim \mathcal{N}(0, I)$ and denoise it step by step:
+Once trained, we start from `pure noise` $\mathbf{x}_T \sim \mathcal{N}(0, \mathbf{I})$ and denoise it step by step:
 
-$$\mathbf{x}_{t-1} = \mu_{\theta}(\mathbf{x}_t, t) + \sigma_tz, \quad z \sim \mathcal{N}(0, I)$$
+$$\mathbf{x}_{t-1} = \mu_{\theta}(\mathbf{x}_t, t) + \sigma_t\mathbf{z}, \quad \mathbf{z} \sim \mathcal{N}(0, \mathbf{I})$$
 
 At each step, the model predicts the clean version from the noisy version until $x_0$ is obtained.
 
@@ -57,15 +57,15 @@ It provides a tracable way to `approximate` the intracable true log-likelihood o
 
 Now, the model optimizes the `ELBO` or Variational Lower bound on the `negative log-likelihood`:
 
-$$\log p(\mathbf{x}_0) \ge \mathbb{E}_q \left[ \log \frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)} \right]$$
+$$\log p(\mathbf{x}_0) \geq \mathbb{E}_q \left[ \log \frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)} \right]$$
 
 This decomposes into terms of measuring how well the model matches the reverse process to the true distribution.
 
 Diffusion models are trained by minimizing a loss function that corresponds to the negative `ELBO` which is:
 
-$$\log p_{\theta}(\mathbf{x}_0) \ge \text{ELBO}(\theta)$$
+$$\log p_{\theta}(\mathbf{x}_0) \geq \text{ELBO}(\theta)$$
 
-$$\text{ELBO} = \mathbb{E}_q \left[ \sum_{t=1}^T \text{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) || p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)) - \log p_\theta(\mathbf{x}_T) \right]$$
+$$\text{ELBO} = \mathbb{E}_q \left[ \sum_{t=1}^T \text{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) \| p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)) - \log p_\theta(\mathbf{x}_T) \right]$$
 
 So, we are minimizing this:
 $$-\text{ELBO}(\theta)$$
