@@ -35,7 +35,7 @@ $$p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)$$
 
 We model this as `Gaussian` as well
 
-$$p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1};\mu_\theta(\mathbf{x}_t, t), \sum_{\theta}(\mathbf{x}_t, t))$$
+$p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1};\mu_\theta(\mathbf{x}_t, t), \sum_{\theta}(\mathbf{x}_t, t))$
 
 Instead of predicting $\mu_{\theta}$ and $\sum_{\theta}$ directly, [DDPM](https://arxiv.org/abs/2006.11239) reformulates the problem to predict the noise $\epsilon$.
 
