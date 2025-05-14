@@ -12,7 +12,7 @@ Let's denote
 ## 1. Forward Diffusion Process (Adding Noise)
 This is a `Markov process` that slowly add Gaussian noise
 
-$q(\mathbf{x}_t|\mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1-\beta_t}\mathbf{x}_{t-1}, \beta_t\mathbf{I})$
+![Forward pass](assets/forward_pass.png)
 
 Here
 
