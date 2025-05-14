@@ -19,7 +19,7 @@ Here
 * $\beta_t \in (0, 1)$ is a small noise variance at time $t$
 * The total process from $x_0$ to $x_T$ (pure noise) is:
 
-$q(x_{1:T}|x_0) = \prod_{t=1}^T q(x_t|x}_{t-1})$
+$q(x_{1:T}|x_0) = \prod_{t=1}^T q(x_t|x_{t-1})$
 
 By composing, we can directly sample $x_t$ from $x_0$
 
