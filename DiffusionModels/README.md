@@ -25,9 +25,12 @@ By composing, we can directly sample $x_t$ from $x_0$
 
 $$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\mathbf{\epsilon}, \quad \mathbf{\epsilon} \sim \mathcal{N}(0, \mathbf{I})$$
 
-where 
+where  
 
-$$\bar{\alpha}_t = \prod_{s=1}^t (1-\beta_s)$$
+\[
+\bar{\alpha}_t = \prod_{s=1}^t (1 - \beta_s)
+\]
+
 
 ## 2. Reverse Process (Denoising)
 The model learns the reverse `conditional` probability:
