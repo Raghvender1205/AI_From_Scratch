@@ -5,23 +5,23 @@ They consist of 2 processes
 2. Reverse Process (Generation) -> In this, the model learns to denoise and generate realistic samples from noise.
 
 Let's denote
-- $\mathbf{x}_0$: Original Data sample
-- $\mathbf{x}_t$: Noisy version of the data at time step $t$
+- $x_0$: Original Data sample
+- $x_t$: Noisy version of the data at time step $t$
 - $T$: Total number of steps 
 
 ## 1. Forward Diffusion Process (Adding Noise)
 This is a `Markov process` that slowly add Gaussian noise
 
-![Forward pass](https://github.com/Raghvender1205/AI_From_Scratch/blob/9bb1ba129c0f862becc57255f6a991cf8c8baf63/DiffusionModels/assets/forward_pass.png)
+$q(x_t|x_{t-1}) = N(x_t; \sqrt{1-\beta_t}x_{t-1}, \beta_tI)$
 
 Here
 
 * $\beta_t \in (0, 1)$ is a small noise variance at time $t$
-* The total process from $\mathbf{x}_0$ to $\mathbf{x}_T$ (pure noise) is:
+* The total process from $x_0$ to $x_T$ (pure noise) is:
 
-$q(\mathbf{x}_{1:T}|\mathbf{x}_0) = \prod_{t=1}^T q(\mathbf{x}_t|\mathbf{x}_{t-1})$
+$q(x_{1:T}|x_0) = \prod_{t=1}^T q(x_t|x}_{t-1})$
 
-By composing, we can directly sample $\mathbf{x}_t$ from $\mathbf{x}_0$
+By composing, we can directly sample $x_t$ from $x_0$
 
 $\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\mathbf{\epsilon}, \quad \mathbf{\epsilon} \sim \mathcal{N}(0, \mathbf{I})$
 
