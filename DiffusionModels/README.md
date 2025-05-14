@@ -25,11 +25,7 @@ By composing, we can directly sample $x_t$ from $x_0$
 
 $$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\mathbf{\epsilon}, \quad \mathbf{\epsilon} \sim \mathcal{N}(0, \mathbf{I})$$
 
-where  
-
-\[
-\bar{\alpha}_t = \prod_{s=1}^t (1 - \beta_s)
-\]
+where `ᾱₜ = ∏ₛ₌₁ᵗ (1 - βₛ)`
 
 
 ## 2. Reverse Process (Denoising)
