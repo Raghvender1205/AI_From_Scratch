@@ -1,5 +1,3 @@
-This contains code and blogs regarding Diffusion Models
-
 # Diffusion Models
 `Diffusion Models` are a class of generative models that learn to create data (`images`, `audio` etc) by reversing a `noising` process.
 They consist of 2 processes
@@ -33,8 +31,6 @@ where $\bar{\alpha}_t = \prod_{s=1}^t (1-\beta_s)$
 The model learns the reverse `conditional` probability:
 
 $p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)$
-
-
 
 ### TODO
 * Denoising Diffusion (DDPM)
