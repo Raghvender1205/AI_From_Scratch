@@ -12,7 +12,7 @@ Let's denote
 ## 1. Forward Diffusion Process (Adding Noise)
 This is a `Markov process` that slowly add Gaussian noise
 
-![Forward pass](assets/forward_pass.png)
+![Forward pass](https://github.com/Raghvender1205/AI_From_Scratch/blob/9bb1ba129c0f862becc57255f6a991cf8c8baf63/DiffusionModels/assets/forward_pass.png)
 
 Here
 
