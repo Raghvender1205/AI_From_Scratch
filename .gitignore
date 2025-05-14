@@ -1,4 +1,4 @@
-
+.idea/
 .vscode/c_cpp_properties.json
 *.json
 PyTorchLightning/Basics/.ipynb_checkpoints/Introduction to PyTorch-checkpoint.ipynb
